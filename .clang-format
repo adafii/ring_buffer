@@ -1,0 +1,18 @@
+---
+Language: Cpp
+BasedOnStyle: Chromium
+
+AccessModifierOffset: -4
+IndentWidth: 4
+UseTab: Never
+ColumnLimit: 0
+
+KeepEmptyLinesAtTheStartOfBlocks: true
+
+SortIncludes: "CaseInsensitive"
+IncludeBlocks: Merge
+IncludeCategories:
+  - Regex: '^".*'
+    Priority: 1
+  - Regex: '^<.*'
+    Priority: 2
