@@ -13,42 +13,38 @@ class ring_buffer {
 public:
     constexpr void write(element_t data) {
         auto local_head = head_.load();
-        while (!head_.compare_exchange_strong(local_head, local_head + 1)) {
+        while (!head_.compare_exchange_strong(local_head, (local_head + 1) % buffer_size)) {
         }
 
-        auto ring_head = local_head % buffer_size;
+        buffer_[local_head].state.wait(state_t::writing);
+        buffer_[local_head].state.wait(state_t::written);
+        buffer_[local_head].state.wait(state_t::reading);
 
-        buffer_[ring_head].state.wait(state_t::writing);
-        buffer_[ring_head].state.wait(state_t::written);
-        buffer_[ring_head].state.wait(state_t::reading);
+        buffer_[local_head].state.store(state_t::writing);
+        buffer_[local_head].state.notify_all();
 
-        buffer_[ring_head].state.store(state_t::writing);
-        buffer_[ring_head].state.notify_all();
+        buffer_[local_head].data = data;
 
-        buffer_[ring_head].data = data;
-
-        buffer_[ring_head].state.store(state_t::written);
-        buffer_[ring_head].state.notify_all();
+        buffer_[local_head].state.store(state_t::written);
+        buffer_[local_head].state.notify_all();
     }
 
     [[nodiscard]] constexpr auto read() {
         auto local_tail = tail_.load();
-        while (!tail_.compare_exchange_strong(local_tail, local_tail + 1)) {
+        while (!tail_.compare_exchange_strong(local_tail, (local_tail + 1) % buffer_size)) {
         }
 
-        auto ring_tail = local_tail % buffer_size;
+        buffer_[local_tail].state.wait(state_t::reading);
+        buffer_[local_tail].state.wait(state_t::read);
+        buffer_[local_tail].state.wait(state_t::writing);
 
-        buffer_[ring_tail].state.wait(state_t::reading);
-        buffer_[ring_tail].state.wait(state_t::read);
-        buffer_[ring_tail].state.wait(state_t::writing);
+        buffer_[local_tail].state.store(state_t::reading);
+        buffer_[local_tail].state.notify_all();
 
-        buffer_[ring_tail].state.store(state_t::reading);
-        buffer_[ring_tail].state.notify_all();
+        auto read_data = buffer_[local_tail].data;
 
-        auto read_data = buffer_[ring_tail].data;
-
-        buffer_[ring_tail].state.store(state_t::read);
-        buffer_[ring_tail].state.notify_all();
+        buffer_[local_tail].state.store(state_t::read);
+        buffer_[local_tail].state.notify_all();
 
         return read_data;
     }
